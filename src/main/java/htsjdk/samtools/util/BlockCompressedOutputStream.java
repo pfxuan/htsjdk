@@ -23,6 +23,8 @@
  */
 package htsjdk.samtools.util;
 
+import htsjdk.samtools.util.zip.DeflaterFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -124,7 +126,7 @@ public class BlockCompressedOutputStream
     public BlockCompressedOutputStream(final File file, final int compressionLevel) {
         this.file = file;
         codec = new BinaryCodec(file, true);
-        deflater = new Deflater(compressionLevel, true);
+        deflater = DeflaterFactory.makeDeflater(compressionLevel, true);
     }
 
     /**
@@ -141,7 +143,7 @@ public class BlockCompressedOutputStream
         if (file != null) {
             codec.setOutputFileName(file.getAbsolutePath());
         }
-        deflater = new Deflater(compressionLevel, true);
+        deflater = DeflaterFactory.makeDeflater(compressionLevel, true);
     }
 
     /**
