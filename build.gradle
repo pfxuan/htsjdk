@@ -1,25 +1,16 @@
 buildscript {
     repositories {
         mavenCentral()
-        jcenter()
-    }
-
-    dependencies {
-        classpath 'com.github.ben-manes:gradle-versions-plugin:0.11.3'  //used for identifying dependencies that need updating
     }
 }
 
 apply plugin: 'java'
-apply plugin: 'idea'
-apply plugin: 'com.github.ben-manes.versions'
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    compile files("${System.properties['java.home']}/../lib/tools.jar")
-
     compile "org.apache.commons:commons-jexl:2.1.1"
     compile "commons-logging:commons-logging:1.1.1"
     compile "org.xerial.snappy:snappy-java:1.0.3-rc3"
@@ -44,6 +35,11 @@ jar {
                 'Implementation-Vendor' : 'Broad Institute',
                 'Implementation-Version': version
     }
+}
+
+task copyLibsForPicard(type: Copy) {
+    into "build/libs"
+    from configurations.compile
 }
 
 import org.gradle.internal.os.OperatingSystem;
