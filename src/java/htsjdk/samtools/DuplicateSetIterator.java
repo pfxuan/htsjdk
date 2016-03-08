@@ -24,6 +24,8 @@
 package htsjdk.samtools;
 
 import htsjdk.samtools.util.CloseableIterator;
+import htsjdk.samtools.util.Log;
+import htsjdk.samtools.util.ProgressLogger;
 import htsjdk.samtools.util.SortingCollection;
 
 import java.io.File;
@@ -54,7 +56,14 @@ public class DuplicateSetIterator implements CloseableIterator<DuplicateSet> {
     public DuplicateSetIterator(final CloseableIterator<SAMRecord> iterator,
                                 final SAMFileHeader header,
                                 final boolean preSorted) {
-        this(iterator, header, preSorted, new SAMRecordDuplicateComparator(Collections.singletonList(header)));
+        this(iterator, header, preSorted, null);
+    }
+
+    public DuplicateSetIterator(final CloseableIterator<SAMRecord> iterator,
+                                final SAMFileHeader header,
+                                final boolean preSorted,
+                                final SAMRecordDuplicateComparator comparator) {
+        this(iterator, header, preSorted, comparator, null);
     }
 
     /**
@@ -64,26 +73,35 @@ public class DuplicateSetIterator implements CloseableIterator<DuplicateSet> {
     public DuplicateSetIterator(final CloseableIterator<SAMRecord> iterator,
                                 final SAMFileHeader header,
                                 final boolean preSorted,
-                                final SAMRecordDuplicateComparator comparator) {
-        this.comparator = comparator;
+                                final SAMRecordDuplicateComparator comparator,
+                                final Log log) {
+        this.comparator = (comparator == null) ? new SAMRecordDuplicateComparator(Collections.singletonList(header)) : comparator;
 
         if (preSorted) {
             this.wrappedIterator = iterator;
         } else {
+            ProgressLogger progressLogger = null;
+            if (log != null) {
+                progressLogger = new ProgressLogger(log, 100000);
+                log.info("Duplicate set iterator initializing.");
+            }
+
             // Sort it!
             final int maxRecordsInRam = SAMFileWriterImpl.getDefaultMaxRecordsInRam();
             final File tmpDir = new File(System.getProperty("java.io.tmpdir"));
             final SortingCollection<SAMRecord> alignmentSorter = SortingCollection.newInstance(SAMRecord.class,
-                    new BAMRecordCodec(header), comparator,
+                    new BAMRecordCodec(header), this.comparator,
                     maxRecordsInRam, tmpDir);
 
             while (iterator.hasNext()) {
                 final SAMRecord record = iterator.next();
                 alignmentSorter.add(record);
+                if (progressLogger != null) progressLogger.record(record);
             }
             iterator.close();
 
             this.wrappedIterator = alignmentSorter.iterator();
+            if (log != null) log.info("Duplicate set iterator initialized.");
         }
 
         this.duplicateSet = new DuplicateSet(this.comparator);
