@@ -56,6 +56,7 @@ public class GenotypeLikelihoodsUnitTest extends VariantBaseTest {
     @BeforeTest
     public void initializeAnyploidPLIndexToAlleleIndices() {
         GenotypeLikelihoods.initializeAnyploidPLIndexToAlleleIndices(1, 1);
+        GenotypeLikelihoods.initializeAnyploidPLIndexToAlleleIndices(2, 1);
         GenotypeLikelihoods.initializeAnyploidPLIndexToAlleleIndices(2, 2);
         GenotypeLikelihoods.initializeAnyploidPLIndexToAlleleIndices(2, 3);
     }
@@ -269,10 +270,10 @@ public class GenotypeLikelihoodsUnitTest extends VariantBaseTest {
     @Test(dataProvider = "testCalculateAnyploidPLcacheData")
     public void testInitializeAnyploidPLIndexToAlleleIndices(final int altAlleles, final int ploidy, final List<List<Integer>> expected) {
         if ( altAlleles >= 1 && ploidy >= 1 ) { // Bypass test with bad data
-            Map<Integer, List<List<Integer>>> expectedMap = new HashMap<Integer, List<List<Integer>>>();
-            expectedMap.put(ploidy, expected);
-            for (Map.Entry<Integer, List<List<Integer>>> entry : GenotypeLikelihoods.anyploidPloidyToPLIndexToAlleleIndices.entrySet()) {
-                if (expectedMap.containsKey(entry.getKey()))
+            Map<GenotypeLikelihoods.AltAllelesAndPloidy, List<List<Integer>>> expectedMap = new HashMap<GenotypeLikelihoods.AltAllelesAndPloidy, List<List<Integer>>>();
+            expectedMap.put(new GenotypeLikelihoods.AltAllelesAndPloidy(ploidy, altAlleles), expected);
+            for (Map.Entry<GenotypeLikelihoods.AltAllelesAndPloidy, List<List<Integer>>> entry : GenotypeLikelihoods.anyploidPloidyToPLIndexToAlleleIndices.entrySet()) {
+                if ( expectedMap.containsKey(entry.getKey()) )
                     Assert.assertEquals(entry.getValue(), expectedMap.get(entry.getKey()));
             }
         }
@@ -310,7 +311,7 @@ public class GenotypeLikelihoodsUnitTest extends VariantBaseTest {
 
     @Test(dataProvider = "testGetAllelesData")
     public void testGetAlleles(final int PLindex, final int altAlleles, final int ploidy, final List<Integer> expected ) {
-        Assert.assertEquals(GenotypeLikelihoods.getAlleles(PLindex, ploidy), expected);
+        Assert.assertEquals(GenotypeLikelihoods.getAlleles(PLindex, ploidy, altAlleles), expected);
     }
 
     @DataProvider
@@ -325,12 +326,12 @@ public class GenotypeLikelihoodsUnitTest extends VariantBaseTest {
 
     @Test(dataProvider = "testGetAllelesIndexOutOfBoundsData", expectedExceptions = IllegalStateException.class)
     public void testGetAllelesOutOfBounds(final int PLindex, final int ploidy) {
-        final List<Integer> alleles = GenotypeLikelihoods.getAlleles(PLindex, ploidy);
+        final List<Integer> alleles = GenotypeLikelihoods.getAlleles(PLindex, ploidy, 1);
     }
 
     @Test(expectedExceptions = IllegalStateException.class)
     public void testGetAllelesUnitialized() {
         GenotypeLikelihoods.anyploidPloidyToPLIndexToAlleleIndices.clear();
-        final List<Integer> alleles = GenotypeLikelihoods.getAlleles(0, 3);
+        final List<Integer> alleles = GenotypeLikelihoods.getAlleles(0, 3, 1);
     }
 }

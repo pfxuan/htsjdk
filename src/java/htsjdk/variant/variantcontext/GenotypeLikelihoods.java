@@ -76,10 +76,11 @@ public class GenotypeLikelihoods {
 
     /**
      * A cache of PL index to a list of alleles for any ploidy.
-     * For example, for a ploidy of 3, the allele lists for each PL index is:
+     * For example, for a ploidy of 3 and 3 alleles, the allele lists for each PL index is:
      * {0,0,0}, {0,0,1}, {0,1,1}, {1,1,1}, {0,0,2}, {0,1,2}, {1,1,2}, {0,2,2}, {1,2,2}, {2,2,2}
      */
-    protected final static Map<Integer, List<List<Integer>>> anyploidPloidyToPLIndexToAlleleIndices = new HashMap<Integer, List<List<Integer>>>();
+    protected final static Map<AltAllelesAndPloidy, List<List<Integer>>> anyploidPloidyToPLIndexToAlleleIndices =
+            new HashMap<AltAllelesAndPloidy, List<List<Integer>>>();
 
     public final static GenotypeLikelihoods fromPLField(String PLs) {
         return new GenotypeLikelihoods(PLs);
@@ -314,7 +315,7 @@ public class GenotypeLikelihoods {
     //
     // -------------------------------------------------------------------------------------
 
-    /*
+    /**
     * Class representing the 2 alleles (or rather their indexes into VariantContext.getAllele()) corresponding to a specific PL index.
     * Note that the reference allele is always index=0.
     */
@@ -324,6 +325,39 @@ public class GenotypeLikelihoods {
         public GenotypeLikelihoodsAllelePair(final int alleleIndex1, final int alleleIndex2) {
             this.alleleIndex1 = alleleIndex1;
             this.alleleIndex2 = alleleIndex2;
+        }
+    }
+
+
+    /**
+     * Class holding the number of alternate alleles and ploidy
+     * Note that the reference allele is always index=0.
+     */
+    public static class AltAllelesAndPloidy {
+        public final int altAllelels, ploidy;
+
+        public AltAllelesAndPloidy(final int altAllelels, final int ploidy) {
+            this.altAllelels = altAllelels;
+            this.ploidy = ploidy;
+        }
+
+        @Override
+        public boolean equals(final Object o){
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            final AltAllelesAndPloidy other = (AltAllelesAndPloidy) o;
+            if ( other.ploidy != ploidy ) return false;
+            if ( other.altAllelels != altAllelels ) return false;
+
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = altAllelels;
+            result = 31 * result + ploidy;
+            return result;
         }
     }
 
@@ -510,8 +544,11 @@ public class GenotypeLikelihoods {
         if ( ploidy <= 0 )
             throw new IllegalArgumentException("Ploidy must be at least 1, not " + ploidy);
 
-        // create the allele indices for each PL index for a ploidy
-        anyploidPloidyToPLIndexToAlleleIndices.put(ploidy, calculateAnyploidPLcache(altAlleles, ploidy));
+        final AltAllelesAndPloidy key = new AltAllelesAndPloidy(altAlleles, ploidy);
+
+        // create the allele indices for each PL index for a ploidy and alternate allele
+        if ( !anyploidPloidyToPLIndexToAlleleIndices.containsKey(key) )
+            anyploidPloidyToPLIndexToAlleleIndices.put(key, calculateAnyploidPLcache(altAlleles, ploidy));
     }
 
     /**
@@ -520,24 +557,30 @@ public class GenotypeLikelihoods {
      *
      * @param PLindex   the PL index
      * @param ploidy    number of chromosomes
+     * @param altAlleles number of alternate alleles
      * @return the ploidy allele indices
      * @throws IllegalStateException if @see #anyploidPloidyToPLIndexToAlleleIndices does not contain the requested ploidy or PL index
      */
-    public static synchronized List<Integer> getAlleles(final int PLindex, final int ploidy) {
+    public static synchronized List<Integer> getAlleles(final int PLindex, final int ploidy, final int altAlleles) {
         if ( ploidy == 2 ) { // diploid
             final GenotypeLikelihoodsAllelePair pair = getAllelePair(PLindex);
             return Arrays.asList(pair.alleleIndex1, pair.alleleIndex2);
         } else { // non-diploid
-            if (!anyploidPloidyToPLIndexToAlleleIndices.containsKey(ploidy))
-                throw new IllegalStateException("Must initialize the cache of allele anyploid indices for ploidy " + ploidy);
+            final AltAllelesAndPloidy key = new AltAllelesAndPloidy(altAlleles, ploidy);
+            if (!anyploidPloidyToPLIndexToAlleleIndices.containsKey(key) )
+                throw new IllegalStateException("Must initialize the cache of allele anyploid indices for ploidy " + ploidy + " and " + altAlleles + " alternate alleles");
 
-            if (PLindex < 0 || PLindex >= anyploidPloidyToPLIndexToAlleleIndices.get(ploidy).size()) {
-                final String msg = "The PL index " + PLindex + " does not exist for " + ploidy + " ploidy, " +
+            if (PLindex < 0 || PLindex >= anyploidPloidyToPLIndexToAlleleIndices.get(key).size()) {
+                final String msg = "The PL index " + PLindex + " does not exist for " + ploidy + " ploidy and " + altAlleles + " alternate alleles, " +
                         (PLindex < 0 ? "cannot have a negative value." : "initialized the cache of allele anyploid indices with the incorrect number of alternate alleles.");
                 throw new IllegalStateException(msg);
             }
+            
+            if ( altAlleles <= 0 ) {
+                throw new IllegalStateException("Must have at least one alternate allele");
+            }
 
-            return anyploidPloidyToPLIndexToAlleleIndices.get(ploidy).get(PLindex);
+            return anyploidPloidyToPLIndexToAlleleIndices.get(new AltAllelesAndPloidy(altAlleles, ploidy)).get(PLindex);
         }
     }
 
